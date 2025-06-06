@@ -7,7 +7,7 @@ import pyautogui
 import time
 import datetime
 import os
-
+#s
 OUTPUT_DIR = "output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
