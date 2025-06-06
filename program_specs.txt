@@ -1,0 +1,4 @@
+build me a productivity program on windows that automatically records the screen and webcam footage and then uses company-hired verifiers to verify that the user is performing tasks as specified (with some specified allowance for breaks, etc). this is geared for individuals looking to self-enforce their productivity, not for companies monitoring employees. 
+
+
+to keep it a simple MVP, allow users to specify length of a session and then start it and then record all displays until the period ends and the webcam footage. save these separately in timestamped files. 
