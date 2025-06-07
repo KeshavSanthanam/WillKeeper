@@ -1,15 +1,19 @@
-# main.py
-import tkinter as tk
-from tkinter import messagebox
+# main.py (PyQt5 version)
+import sys
 import threading
+import time
+import os
+import json
+import datetime
 import cv2
 import numpy as np
 import pyautogui
 import mss
-import time
-import datetime
-import os
-import json
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
+    QDateTimeEdit, QFileDialog, QMessageBox
+)
+from PyQt5.QtCore import QTimer, Qt, QDateTime
 
 OUTPUT_DIR = "output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -96,77 +100,93 @@ def start_session(task_description, datetime_start, datetime_end):
     screen_path = os.path.join(session_folder, "screen.mp4")
     webcam_path = os.path.join(session_folder, "webcam.mp4")
 
-    screen_thread = threading.Thread(target=record_screen, args=(screen_path,))
-    webcam_thread = threading.Thread(target=record_webcam, args=(webcam_path,))
+    threading.Thread(target=record_screen, args=(screen_path,), daemon=True).start()
+    threading.Thread(target=record_webcam, args=(webcam_path,), daemon=True).start()
 
-    screen_thread.start()
-    webcam_thread.start()
+class RecorderApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_timer)
+        self.timer.start(500)
 
-def update_timer():
-    if recording and not stop_event.is_set():
-        label_timer.config(text=f"Recorded: {int(recorded_seconds)}s")
-    app.after(500, update_timer)
+    def init_ui(self):
+        self.setWindowTitle("Productivity Recorder")
+        self.setGeometry(100, 100, 400, 300)
 
-def on_start():
-    try:
-        task_description = entry_task.get()
-        datetime_start = entry_datetime_start.get()
-        datetime_end = entry_datetime_end.get()
-        start_button.config(state="disabled")
-        stop_button.config(state="normal")
-        pause_button.config(state="normal")
-        resume_button.config(state="disabled")
-        threading.Thread(target=start_session, args=(task_description, datetime_start, datetime_end), daemon=True).start()
-    except ValueError:
-        messagebox.showerror("Invalid Input", "Invalid input data.")
+        layout = QVBoxLayout()
 
-def on_stop():
-    stop_event.set()
-    start_button.config(state="normal")
-    stop_button.config(state="disabled")
-    pause_button.config(state="disabled")
-    resume_button.config(state="disabled")
+        self.label_task = QLabel("Task Description:")
+        self.entry_task = QLineEdit()
 
-def on_pause():
-    pause_event.set()
-    pause_button.config(state="disabled")
-    resume_button.config(state="normal")
+        self.label_start = QLabel("Allowed Start:")
+        self.datetime_start = QDateTimeEdit(QDateTime.currentDateTime())
+        self.datetime_start.setCalendarPopup(True)
+        self.datetime_start.setDisplayFormat("yyyy-MM-dd HH:mm")
 
-def on_resume():
-    pause_event.clear()
-    pause_button.config(state="normal")
-    resume_button.config(state="disabled")
+        self.label_end = QLabel("Allowed End:")
+        self.datetime_end = QDateTimeEdit(QDateTime.currentDateTime())
+        self.datetime_end.setCalendarPopup(True)
+        self.datetime_end.setDisplayFormat("yyyy-MM-dd HH:mm")
 
-app = tk.Tk()
-app.title("Productivity Recorder")
-app.geometry("400x400")
+        self.label_timer = QLabel("Recorded: 0s")
 
-tk.Label(app, text="Task Description:").pack(pady=5)
-entry_task = tk.Entry(app)
-entry_task.pack()
+        self.btn_start = QPushButton("Start Recording")
+        self.btn_start.clicked.connect(self.on_start)
 
-tk.Label(app, text="Allowed Start (YYYY-MM-DD HH:MM):").pack(pady=5)
-entry_datetime_start = tk.Entry(app)
-entry_datetime_start.pack()
+        self.btn_pause = QPushButton("Pause")
+        self.btn_pause.clicked.connect(self.on_pause)
+        self.btn_pause.setEnabled(False)
 
-tk.Label(app, text="Allowed End (YYYY-MM-DD HH:MM):").pack(pady=5)
-entry_datetime_end = tk.Entry(app)
-entry_datetime_end.pack()
+        self.btn_resume = QPushButton("Resume")
+        self.btn_resume.clicked.connect(self.on_resume)
+        self.btn_resume.setEnabled(False)
 
-start_button = tk.Button(app, text="Start Recording", command=on_start)
-start_button.pack(pady=5)
+        self.btn_stop = QPushButton("Stop")
+        self.btn_stop.clicked.connect(self.on_stop)
+        self.btn_stop.setEnabled(False)
 
-pause_button = tk.Button(app, text="Pause Recording", command=on_pause, state="disabled")
-pause_button.pack(pady=5)
+        for w in [self.label_task, self.entry_task, self.label_start, self.datetime_start,
+                  self.label_end, self.datetime_end, self.btn_start, self.btn_pause,
+                  self.btn_resume, self.btn_stop, self.label_timer]:
+            layout.addWidget(w)
 
-resume_button = tk.Button(app, text="Resume Recording", command=on_resume, state="disabled")
-resume_button.pack(pady=5)
+        self.setLayout(layout)
 
-stop_button = tk.Button(app, text="Stop Recording", command=on_stop, state="disabled")
-stop_button.pack(pady=5)
+    def update_timer(self):
+        if recording and not stop_event.is_set():
+            self.label_timer.setText(f"Recorded: {int(recorded_seconds)}s")
 
-label_timer = tk.Label(app, text="Recorded: 0s")
-label_timer.pack(pady=10)
+    def on_start(self):
+        desc = self.entry_task.text()
+        start = self.datetime_start.dateTime().toString("yyyy-MM-dd HH:mm")
+        end = self.datetime_end.dateTime().toString("yyyy-MM-dd HH:mm")
+        self.btn_start.setEnabled(False)
+        self.btn_pause.setEnabled(True)
+        self.btn_stop.setEnabled(True)
+        self.btn_resume.setEnabled(False)
+        threading.Thread(target=start_session, args=(desc, start, end), daemon=True).start()
 
-update_timer()
-app.mainloop()
+    def on_pause(self):
+        pause_event.set()
+        self.btn_pause.setEnabled(False)
+        self.btn_resume.setEnabled(True)
+
+    def on_resume(self):
+        pause_event.clear()
+        self.btn_pause.setEnabled(True)
+        self.btn_resume.setEnabled(False)
+
+    def on_stop(self):
+        stop_event.set()
+        self.btn_start.setEnabled(True)
+        self.btn_pause.setEnabled(False)
+        self.btn_resume.setEnabled(False)
+        self.btn_stop.setEnabled(False)
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = RecorderApp()
+    window.show()
+    sys.exit(app.exec_())
